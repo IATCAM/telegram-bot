@@ -55,7 +55,7 @@ if (!process.env.BOT_TOKEN) {
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // =====================
-// Logger Middleware
+// Logger
 // =====================
 bot.use(async (ctx, next) => {
   const user = ctx.from?.username || ctx.from?.id;
@@ -64,66 +64,54 @@ bot.use(async (ctx, next) => {
 });
 
 // =====================
-// /start Command + Menu
+// Main Menu (Reply Keyboard)
+// =====================
+const mainMenu = Markup.keyboard([
+  ['❓ این ربات چیکار می‌کنه؟'],
+  ['🛠 چطور از ربات استفاده کنم؟'],
+  ['📞 راه ارتباطی']
+])
+  .resize()
+  .persistent(); // دکمه‌ها همیشه پایین بمانند
+
+// =====================
+// /start
 // =====================
 bot.start((ctx) => {
   ctx.reply(
-    'سلام 👋\nبه ربات خوش آمدید.\nیکی از سوالات زیر را انتخاب کنید:',
-    Markup.inlineKeyboard([
-      [Markup.button.callback('❓ این ربات چیکار می‌کنه؟', 'Q_ABOUT')],
-      [Markup.button.callback('🛠 چطور از ربات استفاده کنم؟', 'Q_HELP')],
-      [Markup.button.callback('📞 راه ارتباطی', 'Q_CONTACT')],
-    ])
+    '👋 سلام\nبه ربات خوش آمدید.\nیکی از گزینه‌های زیر را انتخاب کنید:',
+    mainMenu
   );
 });
 
 // =====================
-// Handle Button Clicks
-// =====================
-bot.on('callback_query', async (ctx) => {
-  const data = ctx.callbackQuery.data;
-
-  switch (data) {
-    case 'Q_ABOUT':
-      await ctx.reply(
-        'این ربات برای پاسخ به سوالات متداول کاربران طراحی شده است.'
-      );
-      break;
-
-    case 'Q_HELP':
-      await ctx.reply(
-        'برای استفاده از ربات کافی است روی دکمه‌ها کلیک کنید و پاسخ را دریافت کنید.'
-      );
-      break;
-
-    case 'Q_CONTACT':
-      await ctx.reply(
-        'برای ارتباط با پشتیبانی:\n@YourUsername'
-      );
-      break;
-
-    default:
-      await ctx.reply('گزینه نامعتبر است.');
-  }
-
-  // بستن حالت loading دکمه
-  await ctx.answerCbQuery();
-});
-
-// =====================
-// Other Commands
-// =====================
-bot.command('ping', (ctx) => {
-  ctx.reply('pong ✅');
-});
-
-// =====================
-// Text Messages (Fallback)
+// Handle Text Messages
 // =====================
 bot.on('text', (ctx) => {
-  ctx.reply(
-    'لطفاً از منوی دکمه‌ای استفاده کنید.\n/start'
-  );
+  const text = ctx.message.text.trim();
+
+  switch (text) {
+    case '❓ این ربات چیکار می‌کنه؟':
+      return ctx.reply(
+        'این ربات برای پاسخ به سوالات متداول کاربران طراحی شده است.'
+      );
+
+    case '🛠 چطور از ربات استفاده کنم؟':
+      return ctx.reply(
+        'کافی است از دکمه‌های پایین صفحه استفاده کنید و پاسخ را دریافت کنید.'
+      );
+
+    case '📞 راه ارتباطی':
+      return ctx.reply(
+        'برای ارتباط با پشتیبانی:\n@YourUsername'
+      );
+
+    default:
+      return ctx.reply(
+        'لطفاً از دکمه‌های پایین صفحه استفاده کنید 👇',
+        mainMenu
+      );
+  }
 });
 
 // =====================
@@ -134,7 +122,7 @@ bot.catch((err) => {
 });
 
 // =====================
-// Launch Bot
+// Launch
 // =====================
 bot.launch();
 console.log('Bot is running...');
