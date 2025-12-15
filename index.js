@@ -42,6 +42,96 @@
 
 
 
+// import { Telegraf, Markup } from 'telegraf';
+// import 'dotenv/config';
+
+// // =====================
+// // Check BOT_TOKEN
+// // =====================
+// if (!process.env.BOT_TOKEN) {
+//   throw new Error('BOT_TOKEN is not defined');
+// }
+
+// const bot = new Telegraf(process.env.BOT_TOKEN);
+
+// // =====================
+// // Logger
+// // =====================
+// bot.use(async (ctx, next) => {
+//   const user = ctx.from?.username || ctx.from?.id;
+//   console.log(`[${new Date().toISOString()}]`, user);
+//   await next();
+// });
+
+// // =====================
+// // Main Menu (Reply Keyboard)
+// // =====================
+// const mainMenu = Markup.keyboard([
+//   ['❓ این ربات چیکار می‌کنه؟'],
+//   ['🛠 چطور از ربات استفاده کنم؟'],
+//   ['📞 راه ارتباطی']
+// ])
+//   .resize()
+//   .persistent(); // دکمه‌ها همیشه پایین بمانند
+
+// // =====================
+// // /start
+// // =====================
+// bot.start((ctx) => {
+//   ctx.reply(
+//     '👋 سلام\nبه ربات خوش آمدید.\nیکی از گزینه‌های زیر را انتخاب کنید:',
+//     mainMenu
+//   );
+// });
+
+// // =====================
+// // Handle Text Messages
+// // =====================
+// bot.on('text', (ctx) => {
+//   const text = ctx.message.text.trim();
+
+//   switch (text) {
+//     case '❓ این ربات چیکار می‌کنه؟':
+//       return ctx.reply(
+//         'این ربات برای پاسخ به سوالات متداول کاربران طراحی شده است.'
+//       );
+
+//     case '🛠 چطور از ربات استفاده کنم؟':
+//       return ctx.reply(
+//         'کافی است از دکمه‌های پایین صفحه استفاده کنید و پاسخ را دریافت کنید.'
+//       );
+
+//     case '📞 راه ارتباطی':
+//       return ctx.reply(
+//         'برای ارتباط با پشتیبانی:\n@IATCAM'
+//       );
+
+//     default:
+//       return ctx.reply(
+//         'لطفاً از دکمه‌های پایین صفحه استفاده کنید 👇',
+//         mainMenu
+//       );
+//   }
+// });
+
+// // =====================
+// // Error Handling
+// // =====================
+// bot.catch((err) => {
+//   console.error('Bot error:', err);
+// });
+
+// // =====================
+// // Launch
+// // =====================
+// bot.launch();
+// console.log('Bot is running...');
+
+
+
+
+
+
 import { Telegraf, Markup } from 'telegraf';
 import 'dotenv/config';
 
@@ -69,10 +159,11 @@ bot.use(async (ctx, next) => {
 const mainMenu = Markup.keyboard([
   ['❓ این ربات چیکار می‌کنه؟'],
   ['🛠 چطور از ربات استفاده کنم؟'],
-  ['📞 راه ارتباطی']
+  ['📞 راه ارتباطی'],
+  ['❌ مخفی کردن منو']
 ])
   .resize()
-  .persistent(); // دکمه‌ها همیشه پایین بمانند
+  .persistent();
 
 // =====================
 // /start
@@ -82,6 +173,13 @@ bot.start((ctx) => {
     '👋 سلام\nبه ربات خوش آمدید.\nیکی از گزینه‌های زیر را انتخاب کنید:',
     mainMenu
   );
+});
+
+// =====================
+// /menu (show menu again)
+// =====================
+bot.command('menu', (ctx) => {
+  ctx.reply('📋 منوی اصلی نمایش داده شد:', mainMenu);
 });
 
 // =====================
@@ -103,13 +201,18 @@ bot.on('text', (ctx) => {
 
     case '📞 راه ارتباطی':
       return ctx.reply(
-        'برای ارتباط با پشتیبانی:\n@YourUsername'
+        'برای ارتباط با پشتیبانی:\n@IATCAM'
+      );
+
+    case '❌ مخفی کردن منو':
+      return ctx.reply(
+        'منوی پایین صفحه مخفی شد.\nبرای نمایش دوباره /menu را بزنید.',
+        Markup.removeKeyboard()
       );
 
     default:
       return ctx.reply(
-        'لطفاً از دکمه‌های پایین صفحه استفاده کنید 👇',
-        mainMenu
+        'لطفاً از منوی پایین صفحه استفاده کنید 👇\nیا دستور /menu را بزنید.'
       );
   }
 });
