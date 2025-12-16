@@ -112,14 +112,14 @@ import { createClient } from '@supabase/supabase-js';
 import 'dotenv/config';
 
 // =====================
-// Env Check
+// ENV CHECK
 // =====================
 if (!process.env.BOT_TOKEN) throw new Error('BOT_TOKEN missing');
 if (!process.env.SUPABASE_URL) throw new Error('SUPABASE_URL missing');
 if (!process.env.SUPABASE_ANON_KEY) throw new Error('SUPABASE_ANON_KEY missing');
 
 // =====================
-// Init
+// INIT
 // =====================
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const supabase = createClient(
@@ -128,7 +128,7 @@ const supabase = createClient(
 );
 
 // =====================
-// Helpers
+// HELPERS
 // =====================
 async function saveUser(ctx) {
   const u = ctx.from;
@@ -195,17 +195,18 @@ bot.command('menu', async (ctx) => {
     cats.map(c => c.title),
     ['❌ مخفی کردن منو']
   );
+
   ctx.reply('📋 منوی اصلی:', menu);
 });
 
 // =====================
-// Text Handler (Core Logic)
+// TEXT HANDLER (FIXED LOGIC)
 // =====================
 bot.on('text', async (ctx) => {
   const text = ctx.message.text.trim();
   const userId = ctx.from.id;
 
-  // Hide menu
+  // ---------- HIDE MENU ----------
   if (text === '❌ مخفی کردن منو') {
     return ctx.reply(
       'منو مخفی شد.\nبرای بازگشت /menu را بزن.',
@@ -213,16 +214,47 @@ bot.on('text', async (ctx) => {
     );
   }
 
-  // Check category or subcategory
+  // ---------- BACK ----------
+  if (text === '🔙 بازگشت') {
+    const cats = await getCategories(null);
+    const menu = keyboardFromTitles(
+      cats.map(c => c.title),
+      ['❌ مخفی کردن منو']
+    );
+    return ctx.reply('منوی اصلی:', menu);
+  }
+
+  // ======================================================
+  // 1️⃣ FIRST: CHECK IF THIS IS A QUESTION (IMPORTANT FIX)
+  // ======================================================
+  const { data: question } = await supabase
+    .from('faq_questions')
+    .select('id,answer')
+    .eq('title', text)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (question) {
+    await supabase.from('user_actions').insert({
+      telegram_id: userId,
+      question_id: question.id
+    });
+
+    return ctx.reply(question.answer);
+  }
+
+  // ======================================================
+  // 2️⃣ THEN: CHECK CATEGORY / SUBMENU
+  // ======================================================
   const { data: cat } = await supabase
     .from('categories')
     .select('id')
     .eq('title', text)
     .eq('is_active', true)
-    .single();
+    .maybeSingle();
 
   if (cat) {
-    // has subcategories?
+    // SUBCATEGORIES
     const subs = await getCategories(cat.id);
     if (subs.length > 0) {
       const kb = keyboardFromTitles(
@@ -232,7 +264,7 @@ bot.on('text', async (ctx) => {
       return ctx.reply('یکی را انتخاب کنید:', kb);
     }
 
-    // else show questions
+    // QUESTIONS
     const questions = await getQuestions(cat.id);
     if (questions.length === 0) {
       return ctx.reply('سؤالی برای این بخش ثبت نشده است.');
@@ -245,46 +277,19 @@ bot.on('text', async (ctx) => {
     return ctx.reply('سوالات:', kb);
   }
 
-  // Back
-  if (text === '🔙 بازگشت') {
-    const cats = await getCategories(null);
-    const menu = keyboardFromTitles(
-      cats.map(c => c.title),
-      ['❌ مخفی کردن منو']
-    );
-    return ctx.reply('منوی اصلی:', menu);
-  }
-
-  // Check question
-  const { data: q } = await supabase
-    .from('faq_questions')
-    .select('id,answer')
-    .eq('title', text)
-    .single();
-
-  if (q) {
-    // save user action
-    await supabase.from('user_actions').insert({
-      telegram_id: userId,
-      question_id: q.id
-    });
-
-    return ctx.reply(q.answer);
-  }
-
-  // Fallback
+  // ---------- FALLBACK ----------
   ctx.reply('لطفاً از منو استفاده کن 👇\n/menu');
 });
 
 // =====================
-// Error Handling
+// ERROR HANDLER
 // =====================
 bot.catch(err => {
   console.error('Bot error:', err);
 });
 
 // =====================
-// Launch
+// LAUNCH
 // =====================
 bot.launch();
 console.log('Bot is running...');
