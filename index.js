@@ -165,10 +165,16 @@ async function getQuestions(categoryId) {
   return data || [];
 }
 
-function keyboardFromTitles(titles, extra = []) {
-  const rows = titles.map(t => [t]);
-  extra.forEach(e => rows.push([e]));
-  return Markup.keyboard(rows).resize().persistent();
+function inlineKeyboard(items, prefix, extraButtons = []) {
+  const rows = items.map(i => [
+    Markup.button.callback(i.title, `${prefix}:${i.id}`)
+  ]);
+
+  extraButtons.forEach(b =>
+    rows.push([Markup.button.callback(b.text, b.data)])
+  );
+
+  return Markup.inlineKeyboard(rows);
 }
 
 // =====================
@@ -178,107 +184,72 @@ bot.start(async (ctx) => {
   await saveUser(ctx);
 
   const cats = await getCategories(null);
-  const menu = keyboardFromTitles(
-    cats.map(c => c.title),
-    ['❌ مخفی کردن منو']
-  );
+  const kb = inlineKeyboard(cats, 'CAT');
 
-  ctx.reply('👋 خوش آمدید\nیکی از گزینه‌ها را انتخاب کنید:', menu);
+  ctx.reply('👋 خوش آمدید\nیکی از گزینه‌ها را انتخاب کنید:', kb);
 });
 
 // =====================
-// /menu
+// CALLBACK HANDLER (CORE)
 // =====================
-bot.command('menu', async (ctx) => {
-  const cats = await getCategories(null);
-  const menu = keyboardFromTitles(
-    cats.map(c => c.title),
-    ['❌ مخفی کردن منو']
-  );
-
-  ctx.reply('📋 منوی اصلی:', menu);
-});
-
-// =====================
-// TEXT HANDLER (FIXED LOGIC)
-// =====================
-bot.on('text', async (ctx) => {
-  const text = ctx.message.text.trim();
+bot.on('callback_query', async (ctx) => {
+  const data = ctx.callbackQuery.data;
   const userId = ctx.from.id;
 
-  // ---------- HIDE MENU ----------
-  if (text === '❌ مخفی کردن منو') {
-    return ctx.reply(
-      'منو مخفی شد.\nبرای بازگشت /menu را بزن.',
-      Markup.removeKeyboard()
-    );
-  }
-
-  // ---------- BACK ----------
-  if (text === '🔙 بازگشت') {
+  // -------- BACK TO MAIN --------
+  if (data === 'BACK:MAIN') {
     const cats = await getCategories(null);
-    const menu = keyboardFromTitles(
-      cats.map(c => c.title),
-      ['❌ مخفی کردن منو']
-    );
-    return ctx.reply('منوی اصلی:', menu);
+    const kb = inlineKeyboard(cats, 'CAT');
+    await ctx.editMessageText('📋 منوی اصلی:', kb);
+    return ctx.answerCbQuery();
   }
 
-  // ======================================================
-  // 1️⃣ FIRST: CHECK IF THIS IS A QUESTION (IMPORTANT FIX)
-  // ======================================================
-  const { data: question } = await supabase
-    .from('faq_questions')
-    .select('id,answer')
-    .eq('title', text)
-    .eq('is_active', true)
-    .maybeSingle();
+  // -------- CATEGORY / SUBCATEGORY --------
+  if (data.startsWith('CAT:')) {
+    const categoryId = data.split(':')[1];
 
-  if (question) {
+    const subs = await getCategories(categoryId);
+    if (subs.length > 0) {
+      const kb = inlineKeyboard(subs, 'CAT', [
+        { text: '🔙 بازگشت', data: 'BACK:MAIN' }
+      ]);
+
+      await ctx.editMessageText('یکی را انتخاب کنید:', kb);
+      return ctx.answerCbQuery();
+    }
+
+    const questions = await getQuestions(categoryId);
+    if (questions.length === 0) {
+      await ctx.answerCbQuery('سؤالی ثبت نشده');
+      return;
+    }
+
+    const kb = inlineKeyboard(questions, 'Q', [
+      { text: '🔙 بازگشت', data: 'BACK:MAIN' }
+    ]);
+
+    await ctx.editMessageText('سوالات:', kb);
+    return ctx.answerCbQuery();
+  }
+
+  // -------- QUESTION --------
+  if (data.startsWith('Q:')) {
+    const questionId = data.split(':')[1];
+
+    const { data: q } = await supabase
+      .from('faq_questions')
+      .select('answer')
+      .eq('id', questionId)
+      .single();
+
     await supabase.from('user_actions').insert({
       telegram_id: userId,
-      question_id: question.id
+      question_id: questionId
     });
 
-    return ctx.reply(question.answer);
+    await ctx.reply(q.answer);
+    return ctx.answerCbQuery();
   }
-
-  // ======================================================
-  // 2️⃣ THEN: CHECK CATEGORY / SUBMENU
-  // ======================================================
-  const { data: cat } = await supabase
-    .from('categories')
-    .select('id')
-    .eq('title', text)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (cat) {
-    // SUBCATEGORIES
-    const subs = await getCategories(cat.id);
-    if (subs.length > 0) {
-      const kb = keyboardFromTitles(
-        subs.map(s => s.title),
-        ['🔙 بازگشت']
-      );
-      return ctx.reply('یکی را انتخاب کنید:', kb);
-    }
-
-    // QUESTIONS
-    const questions = await getQuestions(cat.id);
-    if (questions.length === 0) {
-      return ctx.reply('سؤالی برای این بخش ثبت نشده است.');
-    }
-
-    const kb = keyboardFromTitles(
-      questions.map(q => q.title),
-      ['🔙 بازگشت']
-    );
-    return ctx.reply('سوالات:', kb);
-  }
-
-  // ---------- FALLBACK ----------
-  ctx.reply('لطفاً از منو استفاده کن 👇\n/menu');
 });
 
 // =====================
